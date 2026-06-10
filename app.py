@@ -3,16 +3,15 @@ import requests
 import base64
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from google import genai
-from google.genai import types
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-print(f"Gemini client loaded. API key present: {bool(os.environ.get('GEMINI_API_KEY'))}")
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+print(f"Groq client loaded. API key present: {bool(os.environ.get('GROQ_API_KEY'))}")
 
 SYSTEM_PROMPT = """మీరు MedScan అనే తెలుగు వైద్య సహాయకుడు.
 మీరు భారతీయ రోగులకు మందుల గురించి సహాయం చేస్తారు.
@@ -50,24 +49,22 @@ def get_welcome_message():
 ఉదాహరణ: Paracetamol అని పంపండి"""
 
 
-def ask_gemini(prompt_text, image_data=None, mime_type="image/jpeg"):
+def ask_ai(prompt_text, image_b64=None, mime_type="image/jpeg"):
     try:
-        if image_data:
-            response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
-                contents=[
-                    types.Part.from_bytes(data=image_data, mime_type=mime_type),
-                    types.Part.from_text(text=prompt_text)
-                ]
-            )
-        else:
-            response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
-                contents=prompt_text
-            )
-        return response.text.strip()
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt_text}
+        ]
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            max_tokens=300
+        )
+        return response.choices[0].message.content.strip()
+
     except Exception as e:
-        print(f"Gemini error: {type(e).__name__}: {str(e)}")
+        print(f"Groq error: {type(e).__name__}: {str(e)}")
         return None
 
 
@@ -87,20 +84,14 @@ def whatsapp_bot():
 
     try:
         if media_url and "image" in media_type:
-            image_data = requests.get(
-                media_url,
-                auth=(
-                    os.environ.get("TWILIO_ACCOUNT_SID"),
-                    os.environ.get("TWILIO_AUTH_TOKEN")
-                )
-            ).content
-            prompt = SYSTEM_PROMPT + "\nఈ మందు ఫోటో చూసి తెలుగులో వివరించండి:"
-            reply = ask_gemini(prompt, image_data=image_data, mime_type=media_type)
+            # For images, download and ask Gemini (Groq doesn't support images)
+            # Fall back to asking user to type the medicine name
+            msg.body("📸 ఫోటో అందింది! మందు పేరు కూడా టైప్ చేయండి — మరింత వేగంగా సమాచారం ఇస్తాం 💊")
+            return str(resp)
 
         elif incoming_msg:
-            prompt = SYSTEM_PROMPT + f"\n\nUser message: {incoming_msg}\n\nతెలుగులో జవాబు ఇవ్వండి:"
-            reply = ask_gemini(prompt)
-
+            prompt = f"మందు గురించి తెలుగులో చెప్పండి: {incoming_msg}"
+            reply = ask_ai(prompt)
         else:
             msg.body("మందు పేరు లేదా ఫోటో పంపండి 💊")
             return str(resp)
