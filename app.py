@@ -54,7 +54,7 @@ def ask_gemini(prompt_text, image_data=None, mime_type="image/jpeg"):
     try:
         if image_data:
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash-lite",
                 contents=[
                     types.Part.from_bytes(data=image_data, mime_type=mime_type),
                     types.Part.from_text(text=prompt_text)
@@ -62,7 +62,7 @@ def ask_gemini(prompt_text, image_data=None, mime_type="image/jpeg"):
             )
         else:
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash-lite",
                 contents=prompt_text
             )
         return response.text.strip()
