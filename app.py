@@ -18,13 +18,13 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-GROQ_API_KEY      = os.environ.get("GROQ_API_KEY")
+GROQ_API_KEY       = os.environ.get("GROQ_API_KEY")
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN  = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_NUMBER      = "whatsapp:+14155238886"
 
 if not GROQ_API_KEY:
-    raise EnvironmentError("GROQ_API_KEY is not set.")
+    raise EnvironmentError("GROQ_API_KEY is not set. Add it to Railway Variables.")
 
 groq_client   = Groq(api_key=GROQ_API_KEY)
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -53,7 +53,9 @@ def search_medicine(query: str) -> dict | None:
         return None
     try:
         query_lower = query.lower().strip()
+        # Exact match first
         match = medicine_df[medicine_df["name_lower"] == query_lower]
+        # Partial match fallback
         if match.empty:
             match = medicine_df[medicine_df["name_lower"].str.contains(query_lower, na=False)]
         if not match.empty:
@@ -72,150 +74,128 @@ def search_medicine(query: str) -> dict | None:
         log.error(f"Search error: {e}")
         return None
 
+# Load database at startup
 load_medicine_database()
 
 # ─────────────────────────────────────────
 #  Prompts & Messages
 # ─────────────────────────────────────────
-TELUGU_PROMPT = """You are MedScan, an expert Indian medicine assistant.
-Reply ONLY in Telugu language.
+SINGLE_PROMPT = """You are MedScan, an expert Indian medicine assistant.
+ALWAYS reply in ALL 3 languages combined in ONE single message in this EXACT format.
+Keep each section SHORT — max 2 bullet points per field.
 
-For the given medicine, reply in this format:
-🇮🇳 *MedScan — మందు సమాచారం*
+🇮🇳 *MedScan — Medicine Info*
 ━━━━━━━━━━━━━━━━━━━
 
-💊 *మందు పేరు:* [name]
+🔵 *తెలుగు:*
+💊 *మందు:* [name]
 🏭 *తయారీదారు:* [manufacturer]
-
-🔍 *దేనికి వాడతారు:*
+🔍 *వాడకం:*
 • [use 1]
 • [use 2]
-• [use 3]
-
-⏰ *ఎప్పుడు తీసుకోవాలి:*
-• [timing 1]
-• [timing 2]
-
-🍽️ *ఎలా తీసుకోవాలి:*
-• [how to take]
-
-⚠️ *జాగ్రత్తలు:*
+⏰ *సమయం:* [when to take]
+🍽️ *ఎలా:* [before/after food]
+⚠️ *జాగ్రత్త:*
 • [warning 1]
 • [warning 2]
 
-డాక్టర్‌ను సంప్రదించండి అవసరమైతే 🙏"""
-
-ENGLISH_PROMPT = """You are MedScan, an expert Indian medicine assistant.
-Reply ONLY in English language.
-
-For the given medicine, reply in this format:
-🇬🇧 *MedScan — Medicine Info*
 ━━━━━━━━━━━━━━━━━━━
-
+🔴 *English:*
 💊 *Medicine:* [name]
 🏭 *Manufacturer:* [manufacturer]
-
 🔍 *Used for:*
 • [use 1]
 • [use 2]
-• [use 3]
-
-⏰ *When to take:*
-• [timing 1]
-• [timing 2]
-
-🍽️ *How to take:*
-• [how to take]
-
+⏰ *When:* [timing]
+🍽️ *How:* [before/after food]
 ⚠️ *Warnings:*
 • [warning 1]
 • [warning 2]
 
-Consult a doctor if symptoms are serious 🙏"""
-
-HINDI_PROMPT = """You are MedScan, an expert Indian medicine assistant.
-Reply ONLY in Hindi language.
-
-For the given medicine, reply in this format:
-🇮🇳 *MedScan — दवा की जानकारी*
 ━━━━━━━━━━━━━━━━━━━
-
-💊 *दवा का नाम:* [name]
+🟠 *हिंदी:*
+💊 *दवा:* [name]
 🏭 *निर्माता:* [manufacturer]
-
 🔍 *उपयोग:*
 • [use 1]
 • [use 2]
-• [use 3]
-
-⏰ *कब लें:*
-• [timing 1]
-• [timing 2]
-
-🍽️ *कैसे लें:*
-• [how to take]
-
+⏰ *समय:* [timing]
+🍽️ *कैसे:* [before/after food]
 ⚠️ *चेतावनी:*
 • [warning 1]
 • [warning 2]
 
-गंभीर लक्षण होने पर डॉक्टर से मिलें 🙏"""
+━━━━━━━━━━━━━━━━━━━
+_డాక్టర్‌ను సంప్రదించండి | Consult doctor | डॉक्टर से मिलें_ 🙏"""
 
 WELCOME_MESSAGE = """🇮🇳 *MedScan కి స్వాగతం | Welcome | स्वागत है*
 
 మందుల సమాచారం తెలుగు, English & Hindi లో పొందండి.
+Get medicine info in Telugu, English & Hindi.
+दवाओं की जानकारी तीनों भाषाओं में पाएं।
 
-మీరు చేయగలిగేది:
-📸 మందు ఫోటో పంపండి
-💊 మందు పేరు టైప్ చేయండి
-🔵 తెలుపు గుండ్రం మాత్ర అని వర్ణించండి
+మీరు చేయగలిగేది | You can | आप कर सकते हैं:
+📸 మందు ఫోటో పంపండి | Send medicine photo | दवा की फोटो भेजें
+💊 మందు పేరు టైప్ చేయండి | Type medicine name | दवा का नाम टाइप करें
+🔵 మాత్ర రంగు వర్ణించండి | Describe tablet color | गोली का रंग बताएं
 
-*ఉదాహరణ:* Paracetamol"""
+*ఉదాహరణ | Example | उदाहरण:* Paracetamol"""
 
-PHOTO_MESSAGE = """📸 *ఫోటో అందింది! | Photo received!*
+PHOTO_MESSAGE = """📸 *ఫోటో అందింది! | Photo received! | फोटो मिली!*
 
 మందు పేరు కూడా టైప్ చేయండి.
-Please also type the medicine name. 💊"""
+Please also type the medicine name.
+दवा का नाम भी टाइप करें। 💊"""
 
-ERROR_MESSAGE = "⚠️ సేవ తాత్కాలికంగా అందుబాటులో లేదు. కొద్దిసేపు తర్వాత మళ్ళీ ప్రయత్నించండి 🙏"
+ERROR_MESSAGE = "⚠️ సేవ తాత్కాలికంగా అందుబాటులో లేదు | Service unavailable | सेवा उपलब्ध नहीं. కొద్దిసేపు తర్వాత మళ్ళీ ప్రయత్నించండి 🙏"
 
-GREETINGS = {"hi", "hello", "hey", "నమస్కారం", "హలో", "నమస్తే", "start", "help", "హాయ్", "namaste", "hai"}
+GREETINGS = {
+    "hi", "hello", "hey", "హాయ్", "హలో", "నమస్కారం",
+    "నమస్తే", "namaste", "start", "help", "hai", "helo"
+}
 
 # ─────────────────────────────────────────
-#  AI Helper — separate call per language
+#  AI Helper — single message, all 3 languages
 # ─────────────────────────────────────────
-def ask_ai_in_language(user_content: str, system_prompt: str) -> str | None:
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_content}
-            ],
-            max_tokens=500,
-            temperature=0.3
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        log.error(f"Groq error: {type(e).__name__}: {e}")
-        return None
-
 def build_medicine_context(medicine_name: str, db_info: dict | None) -> str:
     if db_info:
         composition = db_info["composition1"]
         if db_info["composition2"]:
             composition += f" + {db_info['composition2']}"
-        return f"""Medicine: {db_info['name']}
+        return f"""Medicine details from Indian database:
+Name: {db_info['name']}
 Composition: {composition}
 Manufacturer: {db_info['manufacturer']}
 Type: {db_info['type']}
-Pack: {db_info['pack_size']}
-Price: ₹{db_info['price']}"""
+Pack size: {db_info['pack_size']}
+Price: ₹{db_info['price']}
+
+Give complete information based on this composition."""
     else:
-        return f"Medicine name: {medicine_name} (Indian brand — use your knowledge)"
+        return f"""Medicine name: {medicine_name}
+This is likely an Indian brand name. Identify the composition and give complete information."""
+
+def ask_ai_single(user_content: str) -> str | None:
+    """Single Groq call — returns all 3 languages in one message."""
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": SINGLE_PROMPT},
+                {"role": "user",   "content": user_content}
+            ],
+            max_tokens=700,
+            temperature=0.3
+        )
+        reply = response.choices[0].message.content.strip()
+        log.info("AI replied successfully")
+        return reply
+    except Exception as e:
+        log.error(f"Groq error: {type(e).__name__}: {e}")
+        return None
 
 # ─────────────────────────────────────────
-#  Send multiple WhatsApp messages
+#  WhatsApp Message Sender
 # ─────────────────────────────────────────
 def send_whatsapp_message(to: str, body: str):
     try:
@@ -224,6 +204,7 @@ def send_whatsapp_message(to: str, body: str):
             to=to,
             body=body
         )
+        log.info(f"Message sent to {to}")
     except Exception as e:
         log.error(f"Failed to send message: {e}")
 
@@ -239,8 +220,6 @@ def whatsapp_webhook():
 
     log.info(f"Message from {sender}: '{incoming_msg[:50]}' | media={bool(media_url)}")
 
-    # Always return empty 200 response to Twilio immediately
-    # Then send replies using Twilio API directly
     resp = MessagingResponse()
 
     # ── Greeting ──────────────────────────
@@ -259,35 +238,19 @@ def whatsapp_webhook():
         if db_info:
             log.info(f"Found in DB: {db_info['name']} | {db_info['composition1']}")
         else:
-            log.info(f"Not in DB, using AI for: {incoming_msg}")
+            log.info(f"Not in DB — using AI knowledge for: {incoming_msg}")
 
         context = build_medicine_context(incoming_msg, db_info)
+        reply   = ask_ai_single(context)
 
-        # Send Telugu reply
-        telugu_reply = ask_ai_in_language(context, TELUGU_PROMPT)
-        if telugu_reply:
-            send_whatsapp_message(sender, telugu_reply)
-            log.info("Telugu message sent")
-
-        # Send English reply
-        english_reply = ask_ai_in_language(context, ENGLISH_PROMPT)
-        if english_reply:
-            send_whatsapp_message(sender, english_reply)
-            log.info("English message sent")
-
-        # Send Hindi reply
-        hindi_reply = ask_ai_in_language(context, HINDI_PROMPT)
-        if hindi_reply:
-            send_whatsapp_message(sender, hindi_reply)
-            log.info("Hindi message sent")
-
-        if not telugu_reply and not english_reply and not hindi_reply:
-            send_whatsapp_message(sender, ERROR_MESSAGE)
-
+        send_whatsapp_message(sender, reply if reply else ERROR_MESSAGE)
         return str(resp)
 
     # ── Empty message ─────────────────────
-    send_whatsapp_message(sender, "మందు పేరు లేదా ఫోటో పంపండి | Type medicine name | दवा का नाम टाइप करें 💊")
+    send_whatsapp_message(
+        sender,
+        "మందు పేరు లేదా ఫోటో పంపండి | Type medicine name | दवा का नाम टाइप करें 💊"
+    )
     return str(resp)
 
 # ─────────────────────────────────────────
@@ -297,9 +260,9 @@ def whatsapp_webhook():
 def health_check():
     db_status = len(medicine_df) if medicine_df is not None else 0
     return {
-        "status": "ok",
-        "bot": "MedScan",
-        "version": "4.0",
+        "status":           "ok",
+        "bot":              "MedScan",
+        "version":          "5.0",
         "medicines_loaded": db_status
     }, 200
 
@@ -308,5 +271,5 @@ def health_check():
 # ─────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    log.info(f"🚀 Starting MedScan v4.0 on port {port}")
+    log.info(f"🚀 Starting MedScan v5.0 on port {port}")
     app.run(host="0.0.0.0", port=port)
