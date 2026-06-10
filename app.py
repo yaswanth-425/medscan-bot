@@ -252,9 +252,8 @@ def whatsapp_webhook():
         msg.body(PHOTO_MESSAGE)
         return str(resp)
 
-    # ── Medicine query ────────────────────
+   # ── Medicine query ────────────────────
     if incoming_msg:
-        # Search real Indian medicine database first
         db_info = search_medicine(incoming_msg)
         if db_info:
             log.info(f"Found in DB: {db_info['name']} | {db_info['composition1']}")
@@ -262,7 +261,27 @@ def whatsapp_webhook():
             log.info(f"Not in DB, using AI knowledge for: {incoming_msg}")
 
         reply = ask_ai(incoming_msg, db_info)
-        msg.body(reply if reply else ERROR_MESSAGE)
+
+        if reply:
+            # Split into 3 parts — Telugu, English, Hindi separately
+            parts = reply.split("━━━━━━━━━━━━━━━━━━━━━━")
+            parts = [p.strip() for p in parts if p.strip()]
+
+            if len(parts) >= 3:
+                # Send header + Telugu
+                msg.body(parts[0])
+                resp2 = MessagingResponse()
+                msg2 = resp2.message()
+                msg2.body(parts[1])
+                resp3 = MessagingResponse()
+                msg3 = resp3.message()
+                msg3.body(parts[2])
+                # Combine all into one response
+                return str(resp) + str(resp2) + str(resp3)
+            else:
+                msg.body(reply[:1500])
+        else:
+            msg.body(ERROR_MESSAGE)
         return str(resp)
 
     # ── Empty message ─────────────────────
