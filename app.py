@@ -37,6 +37,12 @@ STRICT RULE — ALWAYS reply in ALL 3 languages together in this exact order:
 2. English second
 3. Hindi third
 
+IMPORTANT: For unknown Indian brand names:
+- Try to identify the generic salt/composition
+- Give information based on the drug category
+- Never leave the user without information
+- Say 'ఈ మందు సమాచారం దొరకలేదు, దయచేసి మందు పేరు సరిగ్గా టైప్ చేయండి లేదా ఫోటో పంపండి' only if completely unrecognizable
+
 When a medicine name is received, reply in this EXACT detailed format:
 
 🇮🇳 *MedScan — మందు సమాచారం | Medicine Info | दवा की जानकारी*
@@ -133,10 +139,18 @@ def ask_ai(user_message: str) -> str | None:
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Give complete information about this medicine in Telugu, English and Hindi all together: {user_message}"}
+{"role": "user", "content": f"""Give complete detailed information about this Indian medicine: {user_message}
+
+Important instructions:
+- This may be an Indian brand name, generic name, or local name
+- If you know the generic composition (like Paracetamol, Amoxicillin etc), use that to explain
+- If exact medicine not found, find the closest match and explain
+- NEVER say 'I don't know' or 'medicine not found'
+- Always give useful information in all 3 languages
+- If unsure about brand, explain based on common composition of that type"""}
             ],
             max_tokens=2000,
-            temperature=0.3
+            temperature=0.5
         )
         reply = response.choices[0].message.content.strip()
         log.info(f"AI replied successfully for: {user_message[:30]}")
