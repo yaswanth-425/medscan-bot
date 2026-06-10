@@ -105,9 +105,9 @@ def ask_ai(user_message: str) -> str | None:
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": f"మందు గురించి సమాచారం ఇవ్వండి: {user_message}"}
+                {"role": "user", "content": f"Give complete information about this medicine in Telugu, English and Hindi all together: {user_message}"}
             ],
-            max_tokens=350,
+            max_tokens=800,
             temperature=0.3
         )
         reply = response.choices[0].message.content.strip()
