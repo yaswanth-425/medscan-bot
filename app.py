@@ -91,39 +91,60 @@ Keep each section SHORT — max 2 bullet points per field.
 💊 *మందు:* [name]
 🏭 *తయారీదారు:* [manufacturer]
 🔍 *వాడకం:*
-• [use 1]
-• [use 2]
+- [use 1]
+- [use 2]
+✅ *ప్రయోజనాలు:*
+- [benefit 1]
+- [benefit 2]
 ⏰ *సమయం:* [when to take]
 🍽️ *ఎలా:* [before/after food]
 ⚠️ *జాగ్రత్త:*
-• [warning 1]
-• [warning 2]
+- [warning 1]
+- [warning 2]
+😵 *దుష్ప్రభావాలు:*
+- [side effect 1]
+- [side effect 2]
+💰 *ధర:* ₹[price] | జనరిక్: [generic alternative name]
 
 ━━━━━━━━━━━━━━━━━━━
 🔴 *English:*
 💊 *Medicine:* [name]
 🏭 *Manufacturer:* [manufacturer]
 🔍 *Used for:*
-• [use 1]
-• [use 2]
+- [use 1]
+- [use 2]
+✅ *Benefits:*
+- [benefit 1]
+- [benefit 2]
 ⏰ *When:* [timing]
 🍽️ *How:* [before/after food]
 ⚠️ *Warnings:*
-• [warning 1]
-• [warning 2]
+- [warning 1]
+- [warning 2]
+😵 *Side Effects:*
+- [side effect 1]
+- [side effect 2]
+💰 *Price:* ₹[price] | Generic: [generic alternative name]
 
 ━━━━━━━━━━━━━━━━━━━
 🟠 *हिंदी:*
 💊 *दवा:* [name]
 🏭 *निर्माता:* [manufacturer]
 🔍 *उपयोग:*
-• [use 1]
-• [use 2]
+- [use 1]
+- [use 2]
+✅ *फायदे:*
+- [benefit 1]
+- [benefit 2]
 ⏰ *समय:* [timing]
 🍽️ *कैसे:* [before/after food]
 ⚠️ *चेतावनी:*
-• [warning 1]
-• [warning 2]
+- [warning 1]
+- [warning 2]
+😵 *दुष्प्रभाव:*
+- [side effect 1]
+- [side effect 2]
+💰 *कीमत:* ₹[price] | जेनेरिक: [generic alternative name]
 
 ━━━━━━━━━━━━━━━━━━━
 _డాక్టర్‌ను సంప్రదించండి | Consult doctor | डॉक्टर से मिलें_ 🙏"""
@@ -151,7 +172,7 @@ ERROR_MESSAGE = "⚠️ సేవ తాత్కాలికంగా అంద
 
 GREETINGS = {
     "hi", "hello", "hey", "హాయ్", "హలో", "నమస్కారం",
-    "నమస్తే", "namaste", "start", "help", "hai", "helo"
+    "నమస్తే", "namaste", "start", "help", "hai", "helo","hello"
 }
 
 # ─────────────────────────────────────────
@@ -184,7 +205,7 @@ def ask_ai_single(user_content: str) -> str | None:
                 {"role": "system", "content": SINGLE_PROMPT},
                 {"role": "user",   "content": user_content}
             ],
-            max_tokens=700,
+            max_tokens=1200,
             temperature=0.3
         )
         reply = response.choices[0].message.content.strip()
